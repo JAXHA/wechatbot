@@ -3,11 +3,12 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/869413421/wechatbot/gpt"
 	"github.com/869413421/wechatbot/pkg/logger"
 	"github.com/869413421/wechatbot/service"
 	"github.com/eatmoreapple/openwechat"
-	"strings"
 )
 
 var _ MessageHandlerInterface = (*GroupMessageHandler)(nil)
@@ -51,12 +52,17 @@ func NewGroupMessageHandler(msg *openwechat.Message) (MessageHandlerInterface, e
 		return nil, err
 	}
 	group := &openwechat.Group{User: sender}
-	groupSender, err := msg.SenderInGroup()
+	//发送者要是系统本身的话 那么错误就会出现 所以用占用符号代替err
+	groupSender, _ := msg.SenderInGroup()
+	//Rew, err := msg.Receiver()
+	fmt.Println(sender, groupSender, msg.Content)
+
 	if err != nil {
 		return nil, err
 	}
 
 	userService := service.NewUserService(c, groupSender)
+	//& ：从一个普通变量中取得内存地址  // 初始化
 	handler := &GroupMessageHandler{
 		self:    sender.Self,
 		msg:     msg,
@@ -70,15 +76,27 @@ func NewGroupMessageHandler(msg *openwechat.Message) (MessageHandlerInterface, e
 
 // handle 处理消息
 func (g *GroupMessageHandler) handle() error {
+	//发生的是文本消息处理
 	if g.msg.IsText() {
 		return g.ReplyText()
 	}
+	//判断是否为拍一拍
+	if g.msg.IsPaiYiPai() {
+		g.msg.ReplyText("拍我有什么事情？")
+	}
+
+	//判断是否有人入群
+	if g.msg.IsJoinGroup() {
+		g.msg.ReplyText("哟嚯，来新人啦，快出来接客啦~")
+	}
+
 	return nil
 }
 
 // ReplyText 发送文本消息到群
 func (g *GroupMessageHandler) ReplyText() error {
 	logger.Info(fmt.Sprintf("Received Group %v Text Msg : %v", g.group.NickName, g.msg.Content))
+
 	// 1.不是@的不处理
 	if !g.msg.IsAt() {
 		return nil
